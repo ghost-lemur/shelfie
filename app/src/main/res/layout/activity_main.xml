@@ -1,33 +1,162 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:id="@+id/container"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:paddingTop="?attr/actionBarSize">
+    android:background="@android:color/white"
+    tools:context=".MainActivity">
 
-    <com.google.android.material.bottomnavigation.BottomNavigationView
-        android:id="@+id/nav_view"
-        android:layout_width="0dp"
+    <!-- App Title -->
+    <TextView
+        android:id="@+id/titleText"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="0dp"
-        android:layout_marginEnd="0dp"
-        android:background="?android:attr/windowBackground"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:menu="@menu/bottom_nav_menu" />
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:text="Shelfie"
+        android:textColor="@android:color/black"
+        android:textSize="24sp"
+        android:textStyle="bold" />
 
-    <fragment
-        android:id="@+id/nav_host_fragment_activity_main"
-        android:name="androidx.navigation.fragment.NavHostFragment"
+    <!-- Main Image Card -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/imageCard"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:defaultNavHost="true"
-        app:layout_constraintBottom_toTopOf="@id/nav_view"
-        app:layout_constraintLeft_toLeftOf="parent"
-        app:layout_constraintRight_toRightOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:navGraph="@navigation/mobile_navigation" />
+        android:layout_height="300dp"
+        android:layout_below="@id/titleText"
+        android:layout_marginStart="16dp"
+        android:layout_marginTop="16dp"
+        android:layout_marginEnd="16dp">
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+        <ImageView
+            android:id="@+id/bookImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:src="@drawable/sample_book"
+            android:contentDescription="Book cover" />
+    </androidx.cardview.widget.CardView>
+
+    <!-- Title Container -->
+    <LinearLayout
+        android:id="@+id/titleContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/imageCard"
+        android:layout_marginTop="16dp"
+        android:orientation="vertical"
+        android:gravity="center">
+
+        <TextView
+            android:id="@+id/bookTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Title"
+            android:textColor="@android:color/black"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <!-- Double Arrow Container -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginTop="8dp">
+
+            <ImageView
+                android:id="@+id/upperArrow"
+                android:layout_width="24dp"
+                android:layout_height="12dp"
+                android:src="@drawable/ic_expand"
+                android:layout_marginBottom="-4dp"/>
+
+            <ImageView
+                android:id="@+id/lowerArrow"
+                android:layout_width="24dp"
+                android:layout_height="12dp"
+                android:src="@drawable/ic_expand"/>
+        </LinearLayout>
+
+        <!-- Book Description -->
+        <TextView
+            android:id="@+id/bookDescription"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:layout_marginStart="32dp"
+            android:layout_marginEnd="32dp"
+            android:text="A captivating journey through time and space."
+            android:textColor="@android:color/darker_gray"
+            android:textSize="14sp"
+            android:gravity="center"
+            android:maxLines="2"
+            android:ellipsize="end"/>
+    </LinearLayout>
+
+
+
+    <!-- Action Buttons -->
+    <LinearLayout
+        android:id="@+id/actionButtons"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/titleContainer"
+        android:layout_marginTop="40dp"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/recycleButton"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:layout_marginEnd="150dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Skip"
+            android:src="@drawable/ic_recycle" />
+
+        <ImageButton
+            android:id="@+id/heartButton"
+            android:layout_width="64dp"
+            android:layout_height="64dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Like"
+            android:src="@drawable/ic_heart" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/navigationBar"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_alignParentBottom="true"
+        android:background="@android:color/white"
+        android:elevation="8dp"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/homeButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_home"
+            android:contentDescription="Home" />
+
+        <ImageButton
+            android:id="@+id/profileButton"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_profile"
+            android:contentDescription="Profile" />
+    </LinearLayout>
+
+    <!-- Divider above navigation bar -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_above="@id/navigationBar"
+        android:background="#DDDDDD" />
+
+</RelativeLayout>
