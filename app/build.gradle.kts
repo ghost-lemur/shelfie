@@ -57,5 +57,4 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     implementation ("androidx.lifecycle:lifecycle-runtime-ktx:2.6.2")
     implementation ("androidx.lifecycle:lifecycle-viewmodel-ktx:2.6.2")
-
 }
