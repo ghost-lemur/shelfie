@@ -6,7 +6,8 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-
+import coil.load
+import coil.transform.RoundedCornersTransformation
 
 class FavoritesAdapter(private var books: List<Book> = emptyList()) :
     RecyclerView.Adapter<FavoritesAdapter.ViewHolder>() {
@@ -17,7 +18,6 @@ class FavoritesAdapter(private var books: List<Book> = emptyList()) :
         val bookDescription: TextView = view.findViewById(R.id.bookDescription)
     }
 
-
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context)
             .inflate(R.layout.favorite_book_item, parent, false)
@@ -26,10 +26,19 @@ class FavoritesAdapter(private var books: List<Book> = emptyList()) :
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val book = books[position]
-        holder.bookImage.setImageResource(R.drawable.placeholder_book)
+
+        // Load cover image using Coil
+        holder.bookImage.load(book.coverUrl) {
+            crossfade(true)
+            placeholder(R.drawable.placeholder_book)
+            error(R.drawable.placeholder_book)
+            transformations(RoundedCornersTransformation(8f))
+        }
+
         holder.bookTitle.text = book.title
         holder.bookDescription.text = book.description
     }
+
     override fun getItemCount() = books.size
 
     fun updateBooks(newBooks: List<Book>) {

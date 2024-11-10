@@ -1,4 +1,5 @@
 package com.example.shelfie
+
 import android.os.Bundle
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -15,72 +16,69 @@ import android.content.Intent
 import android.graphics.drawable.Drawable
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Collections
 
 class MainActivity : AppCompatActivity() {
+    // View declarations
     private lateinit var bookImageView: ImageView
     private lateinit var heartButton: ImageButton
     private lateinit var recycleButton: ImageButton
     private lateinit var titleText: TextView
-    private lateinit var homeButton: ImageButton  // Added type
-    private lateinit var profileButton: ImageButton  // Added type
+    private lateinit var homeButton: ImageButton
+    private lateinit var profileButton: ImageButton
     private lateinit var gestureDetector: GestureDetector
     private lateinit var bookDescription: TextView
+    private lateinit var prefsManager: SharedPreferencesManager
 
-    // Sample list of book covers and titles
-    private var bookCovers: MutableList<Drawable> = mutableListOf()
-
-    var allBooks: Array<Book> = arrayOf()
-
-    var likedBooks: Array<Book> = arrayOf()
-
-    var dislikedBooks: Array<Book> = arrayOf()
-
-    var bookReturn: MutableList<Book> = mutableListOf()
-
-    var bookQueue: MutableList<Book> = mutableListOf()
-
+    // State management
+    private var isLoading = false
     private var currentBookIndex = 0
+
+    // Synchronized collections for thread safety
+    private val bookCovers = Collections.synchronizedList(mutableListOf<Drawable>())
+    private val bookReturn = Collections.synchronizedList(mutableListOf<Book>())
+    private val bookQueue = Collections.synchronizedList(mutableListOf<Book>())
+    private val likedBooks = Collections.synchronizedList(mutableListOf<Book>())
+    private val dislikedBooks = Collections.synchronizedList(mutableListOf<Book>())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Initialize views
+        prefsManager = SharedPreferencesManager(this)
         initializeViews()
-        // Set up gesture detector for swipe
         setupGestureDetector()
-        // Set up click listeners
         setupClickListeners()
-        // Get initial 5 recommendations
-        getRecommendations(likedBooks, dislikedBooks)
+        loadInitialBooks()
     }
 
     private fun initializeViews() {
-        // Find views
-        bookImageView = findViewById<ImageView>(R.id.bookImage)
-        heartButton = findViewById<ImageButton>(R.id.heartButton)
-        recycleButton = findViewById<ImageButton>(R.id.recycleButton)
-        titleText = findViewById<TextView>(R.id.bookTitle)
-        homeButton = findViewById<ImageButton>(R.id.homeButton)
-        profileButton = findViewById<ImageButton>(R.id.profileButton)
-        bookDescription = findViewById<TextView>(R.id.bookDescription)
+        // Initialize views
+        bookImageView = findViewById(R.id.bookImage)
+        heartButton = findViewById(R.id.heartButton)
+        recycleButton = findViewById(R.id.recycleButton)
+        titleText = findViewById(R.id.bookTitle)
+        homeButton = findViewById(R.id.homeButton)
+        profileButton = findViewById(R.id.profileButton)
+        bookDescription = findViewById(R.id.bookDescription)
 
-        // Set up button appearance
+        // Setup button appearances
         heartButton.apply {
             setColorFilter(ContextCompat.getColor(context, android.R.color.holo_red_light))
             background = ContextCompat.getDrawable(context, R.drawable.ripple_background)
         }
 
         recycleButton.apply {
-            setColorFilter(ContextCompat.getColor(context, R.color.dark_green))  // Use your custom color
+            setColorFilter(ContextCompat.getColor(context, R.color.dark_green))
             background = ContextCompat.getDrawable(context, R.drawable.ripple_background)
         }
 
-        // Set up navigation button appearances
         homeButton.apply {
             setColorFilter(ContextCompat.getColor(context, android.R.color.black))
             background = ContextCompat.getDrawable(context, R.drawable.ripple_background)
@@ -91,40 +89,28 @@ class MainActivity : AppCompatActivity() {
             background = ContextCompat.getDrawable(context, R.drawable.ripple_background)
         }
 
-        // Set up touch listener for the image
-        bookImageView.setOnTouchListener { v, event ->
+        bookImageView.setOnTouchListener { _, event ->
             gestureDetector.onTouchEvent(event)
             true
         }
     }
 
     private fun setupClickListeners() {
-        heartButton.setOnClickListener {
-            animateAndLike()
-        }
+        heartButton.setOnClickListener { animateAndLike() }
+        recycleButton.setOnClickListener { animateAndSkip() }
 
-        recycleButton.setOnClickListener {
-            animateAndSkip()
-        }
-
-        // Add navigation click listeners
         homeButton.setOnClickListener {
-            // Handle home button click
             homeButton.setColorFilter(ContextCompat.getColor(this, android.R.color.black))
             profileButton.setColorFilter(ContextCompat.getColor(this, android.R.color.darker_gray))
-            // TODO: Implement home navigation
             Toast.makeText(this, "Home", Toast.LENGTH_SHORT).show()
         }
 
-            profileButton.setOnClickListener {
-                // Create and start the intent for FavoritesActivity
-                val intent = Intent(this, FavoritesActivity::class.java)
-                startActivity(intent)
-
-                // Update button colors (although this might not be necessary since we're leaving this activity)
-                profileButton.setColorFilter(ContextCompat.getColor(this, android.R.color.black))
-                homeButton.setColorFilter(ContextCompat.getColor(this, android.R.color.darker_gray))
-            }
+        profileButton.setOnClickListener {
+            val intent = Intent(this, FavoritesActivity::class.java)
+            startActivity(intent)
+            profileButton.setColorFilter(ContextCompat.getColor(this, android.R.color.black))
+            homeButton.setColorFilter(ContextCompat.getColor(this, android.R.color.darker_gray))
+        }
     }
 
     private fun setupGestureDetector() {
@@ -132,110 +118,103 @@ class MainActivity : AppCompatActivity() {
             private val SWIPE_THRESHOLD = 100
             private val SWIPE_VELOCITY_THRESHOLD = 100
 
-            override fun onFling(
-                e1: MotionEvent?,
-                e2: MotionEvent,
-                velocityX: Float,
-                velocityY: Float
-            ): Boolean {
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
                 val diffX = e2.x - (e1?.x ?: 0f)
                 val diffY = e2.y - (e1?.y ?: 0f)
 
-                if (abs(diffX) > abs(diffY)) {
-                    if (abs(diffX) > SWIPE_THRESHOLD && abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
-                        if (diffX > 0) {
-                            // Right swipe - Like
-                            animateAndLike()
-                        } else {
-                            // Left swipe - Skip
-                            animateAndSkip()
-                        }
-                        return true
-                    }
+                if (abs(diffX) > abs(diffY) &&
+                    abs(diffX) > SWIPE_THRESHOLD &&
+                    abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
+                    if (diffX > 0) animateAndLike() else animateAndSkip()
+                    return true
                 }
                 return false
             }
 
             override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-                // Handle single tap - could be used to show book details
                 showBookDetails()
                 return true
             }
         })
     }
 
-    private fun animateAndLike() {
-        val animation = TranslateAnimation(
-            0f, bookImageView.width.toFloat(),
-            0f, 0f
-        ).apply {
-            duration = 300
-            setAnimationListener(object : Animation.AnimationListener {
-                override fun onAnimationStart(animation: Animation?) {
-                    heartButton.isEnabled = false
-                    recycleButton.isEnabled = false
+    private fun loadInitialBooks() {
+        if (isLoading) return
+        isLoading = true
+
+        lifecycleScope.launch {
+            try {
+                getRecommendations(likedBooks.toTypedArray(), dislikedBooks.toTypedArray())
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "Error loading books: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
-                override fun onAnimationRepeat(animation: Animation?) {}
-                override fun onAnimationEnd(animation: Animation?) {
-                    bookImageView.translationX = 0f
-                    likeCurrentItem()
-                    heartButton.isEnabled = true
-                    recycleButton.isEnabled = true
-                }
-            })
+            } finally {
+                isLoading = false
+            }
         }
-        bookImageView.startAnimation(animation)
     }
 
-    private fun animateAndSkip() {
-        val animation = TranslateAnimation(
-            0f, -bookImageView.width.toFloat(),
-            0f, 0f
-        ).apply {
-            duration = 300
-            setAnimationListener(object : Animation.AnimationListener {
-                override fun onAnimationStart(animation: Animation?) {
-                    heartButton.isEnabled = false
-                    recycleButton.isEnabled = false
-                }
-                override fun onAnimationRepeat(animation: Animation?) {}
-                override fun onAnimationEnd(animation: Animation?) {
-                    bookImageView.translationX = 0f
-                    skipCurrentItem()
-                    heartButton.isEnabled = true
-                    recycleButton.isEnabled = true
-                }
-            })
-        }
-        bookImageView.startAnimation(animation)
-    }
+    private fun getRecommendations(liked: Array<Book>, disliked: Array<Book>) {
+        val apiRecFetch = APIRecFetch(this)
+        val shownBooks = prefsManager.getShownBooks() // Get list of previously shown books
 
-    suspend fun loadQueue() {
-        for (i in bookReturn.size - 1 downTo 0) {
-            println("Searching for cover image for: ${bookReturn[i].title}")
-            val coverImageUrl: String? = loadBookCover(bookReturn[i].title)
+        apiRecFetch.getBookRecs(liked, disliked, object : APIRecFetch.BookRecommendationCallback {
+            override fun onSuccess(books: List<Book>) {
+                lifecycleScope.launch {
+                    // Filter out any books that have been shown before
+                    val newBooks = books.filterNot { newBook ->
+                        shownBooks.any { it.title == newBook.title }
+                    }
 
-            if (coverImageUrl != null) {
-                val coverDrawable = fetchDrawableFromUrl(coverImageUrl)
-                if (coverDrawable != null) {
-                    bookCovers.add(coverDrawable) // Only add valid drawables to the list
-                    println("Drawable added for ${bookReturn[i].title}")
-                } else {
-                    println("Failed to convert URL to Drawable for ${bookReturn[i].title}")
+                    if (newBooks.isEmpty()) {
+                        // If all books have been shown, clear history and try again
+                        prefsManager.clearShownBooks()
+                        getRecommendations(liked, disliked)
+                        return@launch
+                    }
+
+                    bookReturn.addAll(newBooks)
+                    loadQueue()
                 }
-            } else {
-                println("Cover image URL is null for ${bookReturn[i].title}")
             }
 
-            bookQueue.add(bookReturn[i])
-            bookReturn.removeAt(i)
-        }
+            override fun onError(error: String) {
+                Toast.makeText(this@MainActivity, error, Toast.LENGTH_SHORT).show()
+            }
+        })
+    }
 
-        // Only call queueResolved if bookCovers has items
-        if (bookCovers.isNotEmpty()) {
-            queueResolved()
-        } else {
-            println("No cover images could be loaded.")
+
+    private suspend fun loadQueue() = withContext(Dispatchers.IO) {
+        try {
+            for (book in bookReturn.toList()) {  // Create a copy to avoid concurrent modification
+                val coverImageUrl = loadBookCover(book.title)
+                if (coverImageUrl != null) {
+                    val coverDrawable = fetchDrawableFromUrl(coverImageUrl)
+                    if (coverDrawable != null) {
+                        withContext(Dispatchers.Main) {
+                            bookCovers.add(coverDrawable)
+                            // Create a new book with the cover URL
+                            val bookWithCover = book.copy(coverUrl = coverImageUrl)
+                            bookQueue.add(bookWithCover)
+                            bookReturn.remove(book)
+                        }
+                    }
+                }
+            }
+
+            withContext(Dispatchers.Main) {
+                if (bookCovers.isNotEmpty()) {
+                    loadCurrentBook()
+                } else {
+                    Toast.makeText(this@MainActivity, "No book covers could be loaded", Toast.LENGTH_SHORT).show()
+                }
+            }
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "Error loading queue: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
@@ -244,82 +223,108 @@ class MainActivity : AppCompatActivity() {
             val connection = URL(url).openConnection() as HttpURLConnection
             connection.doInput = true
             connection.connect()
-
             val inputStream = connection.inputStream
             val bitmap = BitmapFactory.decodeStream(inputStream)
-            BitmapDrawable(null, bitmap)
+            BitmapDrawable(resources, bitmap)
         } catch (e: Exception) {
             e.printStackTrace()
             null
         }
     }
 
-    private suspend fun loadBookCover(title: String): String?{
-        val apiCoverFetch = CoverJPG()
-        return apiCoverFetch.searchBookByTitle(title)
-    }
-
-    private fun queueResolved(){
-        println("All covers resolved.")
-        loadCurrentBook()
+    private suspend fun loadBookCover(title: String): String? {
+        return CoverJPG().searchBookByTitle(title)
     }
 
     private fun loadCurrentBook() {
-        if (currentBookIndex < bookQueue.size) {
+        if (bookQueue.isEmpty() || bookCovers.isEmpty()) {
+            loadInitialBooks()
+            return
+        }
+
+        if (currentBookIndex >= bookQueue.size) {
+            currentBookIndex = 0
+        }
+
+        try {
             bookImageView.setImageDrawable(bookCovers[currentBookIndex])
             titleText.text = bookQueue[currentBookIndex].title
             bookDescription.text = bookQueue[currentBookIndex].description
-        }
-        else if(bookQueue.size == 0){
-            getRecommendations(likedBooks, dislikedBooks)
-        }
-        else {
-            currentBookIndex = 0
-            loadCurrentBook()
+        } catch (e: Exception) {
+            Toast.makeText(this, "Error loading book: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
 
-    private fun getRecommendations(likedBooks: Array<Book>, dislikedBooks: Array<Book>){
-        val apiRecFetch = APIRecFetch(this)
-        apiRecFetch.getBookRecs(likedBooks, dislikedBooks)
+    private fun animateAndLike() {
+        animateSwipe(true) { likeCurrentItem() }
     }
 
-    private fun loadNextBook() {
-        currentBookIndex = (currentBookIndex + 1) % this.bookCovers.size
-        loadCurrentBook()
+    private fun animateAndSkip() {
+        animateSwipe(false) { skipCurrentItem() }
+    }
+
+    private fun animateSwipe(isLike: Boolean, onComplete: () -> Unit) {
+        val animation = TranslateAnimation(
+            0f,
+            if (isLike) bookImageView.width.toFloat() else -bookImageView.width.toFloat(),
+            0f,
+            0f
+        ).apply {
+            duration = 300
+            setAnimationListener(object : Animation.AnimationListener {
+                override fun onAnimationStart(animation: Animation?) {
+                    heartButton.isEnabled = false
+                    recycleButton.isEnabled = false
+                }
+                override fun onAnimationRepeat(animation: Animation?) {}
+                override fun onAnimationEnd(animation: Animation?) {
+                    bookImageView.translationX = 0f
+                    onComplete()
+                    heartButton.isEnabled = true
+                    recycleButton.isEnabled = true
+                }
+            })
+        }
+        bookImageView.startAnimation(animation)
     }
 
     private fun likeCurrentItem() {
-        // Animate heart button
-        heartButton.animate()
-            .scaleX(1.2f)
-            .scaleY(1.2f)
-            .setDuration(100)
-            .withEndAction {
-                heartButton.animate()
-                    .scaleX(1f)
-                    .scaleY(1f)
-                    .setDuration(100)
-                    .start()
-            }
-            .start()
-        // TODO: Add your like logic here (e.g., save to database, make API call)
-        loadNextBook()
+        if (currentBookIndex < bookQueue.size) {
+            val book = bookQueue[currentBookIndex]
+            likedBooks.add(book)
+            prefsManager.saveLikedBook(book)
+            prefsManager.addShownBook(book)
+            loadNextBook()
+        }
     }
-
     private fun skipCurrentItem() {
-        // Animate skip button
-        recycleButton.animate()
-            .rotation(recycleButton.rotation + 360f)
-            .setDuration(300)
-            .start()
-        // TODO: Add your skip logic here
-        loadNextBook()
+        if (currentBookIndex < bookQueue.size) {
+            bookQueue[currentBookIndex].let { book ->
+                dislikedBooks.add(book)
+                prefsManager.addShownBook(book) // Mark as shown
+                loadNextBook()
+            }
+        }
+    }
+    private fun loadNextBook() {
+        currentBookIndex++
+        if (currentBookIndex >= bookQueue.size - 2) {
+            loadInitialBooks()
+        }
+        loadCurrentBook()
     }
 
     private fun showBookDetails() {
-        // TODO: Implement book details view
-        Toast.makeText(this, "Showing details for: ${allBooks[currentBookIndex].title}", Toast.LENGTH_SHORT).show()
+        if (currentBookIndex < bookQueue.size) {
+            Toast.makeText(this, "Showing details for: ${bookQueue[currentBookIndex].title}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        bookCovers.clear()
+        bookQueue.clear()
+        bookReturn.clear()
     }
 
     companion object {

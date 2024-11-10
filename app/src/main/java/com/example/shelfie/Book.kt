@@ -6,7 +6,7 @@ data class Book(
     val title: String,
     val author: String,
     val description: String,
-    val imageUrl: String? = null,
+    val coverUrl: String? = null,
     var isFavorite: Boolean = true
 ) {
     // Secondary constructor without imageUrl and isFavorite
@@ -25,7 +25,7 @@ data class Book(
                 title = map["title"] as? String ?: "",
                 author = map["author"] as? String ?: "",
                 description = map["description"] as? String ?: "",
-                imageUrl = map["imageUrl"] as? String,
+                coverUrl = map["imageUrl"] as? String,
                 isFavorite = map["isFavorite"] as? Boolean ?: true
             )
         }
@@ -48,7 +48,7 @@ data class Book(
             "title" to title,
             "author" to author,
             "description" to description,
-            "imageUrl" to imageUrl,
+            "imageUrl" to coverUrl,
             "isFavorite" to isFavorite
         )
     }

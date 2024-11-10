@@ -14,13 +14,13 @@ class FavoritesActivity : AppCompatActivity() {
     private lateinit var homeButton: ImageButton
     private lateinit var profileButton: ImageButton
     private lateinit var adapter: FavoritesAdapter
-   // private lateinit var prefsManager: SharedPreferencesManager
+    private lateinit var prefsManager: SharedPreferencesManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_favorites)
 
-     //   prefsManager = SharedPreferencesManager(this)
+        prefsManager = SharedPreferencesManager(this)
         initializeViews()
         setupClickListeners()
         loadFavorites()
@@ -54,8 +54,8 @@ class FavoritesActivity : AppCompatActivity() {
     }
 
     private fun loadFavorites() {
-       // val favoriteBooks = prefsManager.getFavoriteBooks()
-        //adapter.updateBooks(favoriteBooks)
+        val favoriteBooks = prefsManager.getLikedBooks()
+        adapter.updateBooks(favoriteBooks)
     }
 
     override fun onResume() {
