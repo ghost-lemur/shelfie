@@ -11,7 +11,7 @@ import java.io.File
 
 class APIRecFetch(private val activity: Activity) {
 
-    fun getBookRecs(liked: Array<String>, disliked: Array<String>) {
+    fun getBookRecs(liked: Array<Array<String>>, disliked: Array<Array<String>>) {
         // Initialize OkHttp client
         val client = OkHttpClient()
 

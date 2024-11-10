@@ -31,14 +31,27 @@ class MainActivity : AppCompatActivity() {
     )
 
 
-    private val bookTitles = listOf(
+    private var bookTitles = listOf(
         "Sample Book 1",
         // Add more book titles here
     )
 
-    private val bookDescriptions = listOf(
+    private var bookAuthors = listOf(
+        "Sample Author 1"
+        // Add more book authors here
+    )
+
+    private var bookDescriptions = listOf(
         "Description for Sample Book 1",
         // Add more book descriptions here
+    )
+
+    private var likedBooks = arrayOf(
+        arrayOf("")
+    )
+
+    private var dislikedBooks = arrayOf(
+        arrayOf("")
     )
 
     private var currentBookIndex = 0
@@ -55,6 +68,10 @@ class MainActivity : AppCompatActivity() {
         setupClickListeners()
         // Load initial book
         loadCurrentBook()
+
+        val apiRecFetch = APIRecFetch(this)
+
+        apiRecFetch.getBookRecs(likedBooks, dislikedBooks)
     }
 
     private fun initializeViews() {
