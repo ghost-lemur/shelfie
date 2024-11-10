@@ -1,8 +1,9 @@
 package com.example.shelfie
 
 data class Book(
-    val id: Int,
+    val id: String,
     val title: String,
     val description: String,
-    val coverResourceId: Int
+    val imageUrl: String? = null,
+    var isFavorite: Boolean = true
 )

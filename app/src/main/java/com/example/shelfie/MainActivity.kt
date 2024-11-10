@@ -242,8 +242,6 @@ class MainActivity : AppCompatActivity() {
                     .start()
             }
             .start()
-
-        Toast.makeText(this, "Liked ${bookTitles.getOrNull(currentBookIndex)}", Toast.LENGTH_SHORT).show()
         // TODO: Add your like logic here (e.g., save to database, make API call)
         loadNextBook()
     }
@@ -254,8 +252,6 @@ class MainActivity : AppCompatActivity() {
             .rotation(recycleButton.rotation + 360f)
             .setDuration(300)
             .start()
-
-        Toast.makeText(this, "Skipped ${bookTitles.getOrNull(currentBookIndex)}", Toast.LENGTH_SHORT).show()
         // TODO: Add your skip logic here
         loadNextBook()
     }
