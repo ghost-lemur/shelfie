@@ -144,7 +144,8 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                getRecommendations(likedBooks.toTypedArray(), dislikedBooks.toTypedArray())
+                val recentGens: List<Book> = bookQueue + bookReturn + prefsManager.getShownBooks()
+                getRecommendations(likedBooks.toTypedArray(), dislikedBooks.toTypedArray(), recentGens)
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@MainActivity, "Error loading books: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -155,26 +156,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun getRecommendations(liked: Array<Book>, disliked: Array<Book>) {
+    private fun getRecommendations(liked: Array<Book>, disliked: Array<Book>, queue: List<Book>) {
         val apiRecFetch = APIRecFetch(this)
-        val shownBooks = prefsManager.getShownBooks() // Get list of previously shown books
+        //val shownBooks = prefsManager.getShownBooks() // Get list of previously shown books
 
-        apiRecFetch.getBookRecs(liked, disliked, object : APIRecFetch.BookRecommendationCallback {
+        apiRecFetch.getBookRecs(liked, disliked, queue, object : APIRecFetch.BookRecommendationCallback {
             override fun onSuccess(books: List<Book>) {
                 lifecycleScope.launch {
                     // Filter out any books that have been shown before
                     val newBooks = books.filterNot { newBook ->
-                        shownBooks.any { it.title == newBook.title }
+                        queue.any { it.title == newBook.title }
                     }
 
                     if (newBooks.isEmpty()) {
                         // If all books have been shown, clear history and try again
                         prefsManager.clearShownBooks()
-                        getRecommendations(liked, disliked)
+                        getRecommendations(liked, disliked, queue)
                         return@launch
                     }
 
-                    bookReturn.addAll(newBooks)
+                    bookReturn.addAll(books)
                     loadQueue()
                 }
             }
@@ -293,7 +294,7 @@ class MainActivity : AppCompatActivity() {
             val book = bookQueue[currentBookIndex]
             likedBooks.add(book)
             prefsManager.saveLikedBook(book)
-            prefsManager.addShownBook(book)
+            //prefsManager.addShownBook(book)
             loadNextBook()
         }
     }
@@ -301,14 +302,15 @@ class MainActivity : AppCompatActivity() {
         if (currentBookIndex < bookQueue.size) {
             bookQueue[currentBookIndex].let { book ->
                 dislikedBooks.add(book)
-                prefsManager.addShownBook(book) // Mark as shown
+                //prefsManager.addShownBook(book) // Mark as shown
                 loadNextBook()
             }
         }
     }
     private fun loadNextBook() {
-        currentBookIndex++
-        if (currentBookIndex >= bookQueue.size - 2) {
+        bookQueue.removeAt(currentBookIndex)
+        bookCovers.removeAt(currentBookIndex)
+        if (currentBookIndex >= bookQueue.size - 4) {
             loadInitialBooks()
         }
         loadCurrentBook()

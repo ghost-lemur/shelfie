@@ -15,10 +15,9 @@ class APIRecFetch(private val activity: Activity) {
         fun onError(error: String)
     }
 
-    fun getBookRecs(liked: Array<Book>, disliked: Array<Book>, callback: BookRecommendationCallback) {
+    fun getBookRecs(liked: Array<Book>, disliked: Array<Book>, recentGens: List<Book>, callback: BookRecommendationCallback) {
         // Get shown books from SharedPreferences
         val prefsManager = SharedPreferencesManager(activity)
-        val shownBooks = prefsManager.getShownBooks()
 
         val client = OkHttpClient()
         val apiKey = activity.assets.open("api-key.txt").bufferedReader().use { it.readText() }
@@ -35,14 +34,14 @@ class APIRecFetch(private val activity: Activity) {
         }
         dislikedString = dislikedString.dropLast(2) + "\n"
 
-        var previouslyShownString = "Previously shown (DO NOT recommend these again):\n"
-        for (book in shownBooks) {
+        var previouslyShownString = "Recently Shown:\n"
+        for (book in recentGens) {
             previouslyShownString += "\"${book.title}\", "
         }
         previouslyShownString = previouslyShownString.dropLast(2) + "\n"
 
         val systemMessage = """
-            You are a backend AI that recommends exactly five books based on a user's preferences. The user will provide two lists: one containing books they like, and one containing books they dislike. Your job is to construct a JSON array of five books (along with their authors and a short 1-2 sentence summary) you would recommend them in the following format:
+            You are a backend AI that recommends exactly five books based on a user's preferences. The user will provide two lists: one containing books they like, and one containing books they dislike. Your job is to construct a JSON array of five new books (along with their authors and a short 1-2 sentence summary) you would recommend them in the following format:
             {
               "books": [
                 {
@@ -61,6 +60,7 @@ class APIRecFetch(private val activity: Activity) {
             User:
             Liked: [["Pride and Prejudice", "Jane Austen", "A witty exploration of social class and romantic misunderstandings in 19th-century England."], ["Hyperbole and a Half", "Allie Brosh", "A collection of humorous and poignant illustrations and stories about life's challenges and absurdities."], ["Ooka the Wise", "L. G. Edmonds", "A Japanese folktale about a wise judge who resolves disputes with cleverness and fairness."]]
             Disliked: [["Unbelievable", "Katy Tur", "A memoir about the author's experience covering the 2016 election, reflecting on truth and media integrity."], ["The Moscow Puzzles", "Boris A. Kordemsky", "A collection of mathematical puzzles, often complex and dry in nature."]]
+            Recently Shown: [["Les Miserables", "Victor Hugo", "A gripping novel about an ex-convict in 19th-century France who seeks redemption while being pursued by a strict inspector."]]
             AI: {
               "books": [
                 {
@@ -90,7 +90,7 @@ class APIRecFetch(private val activity: Activity) {
                 }
               ]
             }
-            Please adhere only to this format and don't add any extra text to your response. Book recommendations should be creative and unique that the user hasn't seen before, supporting their preferences while encouraging them to explore new avenues. Each recommended book must be different from any in the "Previously shown" list, and should engage the user by supporting their preferences while encouraging them to explore new avenues.
+            Please adhere only to this format and don't add any extra text to your response. Book recommendations should be creative and unique that the user hasn't seen before (especially the books in the "recently shown" list), supporting their preferences while encouraging them to explore new avenues. Each recommended book must be different from any in the "Previously shown" list, and should engage the user by supporting their preferences while encouraging them to explore new avenues.
         """.trimIndent()
 
         val jsonBody = JsonObject().apply {
