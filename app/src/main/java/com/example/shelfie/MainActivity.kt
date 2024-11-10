@@ -9,10 +9,16 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.animation.Animation
 import android.view.animation.TranslateAnimation
-import android.view.View
 import android.widget.TextView
 import kotlin.math.abs
 import android.content.Intent
+import android.graphics.drawable.Drawable
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : AppCompatActivity() {
     private lateinit var bookImageView: ImageView
@@ -25,34 +31,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var bookDescription: TextView
 
     // Sample list of book covers and titles
-    private val bookCovers = listOf(
-        R.drawable.placeholder_book,
-        // Add more book cover resources here
-    )
+    private var bookCovers: MutableList<Drawable> = mutableListOf()
 
+    var allBooks: Array<Book> = arrayOf()
 
-    private var bookTitles = listOf(
-        "Sample Book 1",
-        // Add more book titles here
-    )
+    var likedBooks: Array<Book> = arrayOf()
 
-    private var bookAuthors = listOf(
-        "Sample Author 1"
-        // Add more book authors here
-    )
+    var dislikedBooks: Array<Book> = arrayOf()
 
-    private var bookDescriptions = listOf(
-        "Description for Sample Book 1",
-        // Add more book descriptions here
-    )
+    var bookReturn: MutableList<Book> = mutableListOf()
 
-    private var likedBooks = arrayOf(
-        arrayOf("")
-    )
-
-    private var dislikedBooks = arrayOf(
-        arrayOf("")
-    )
+    var bookQueue: MutableList<Book> = mutableListOf()
 
     private var currentBookIndex = 0
 
@@ -66,12 +55,8 @@ class MainActivity : AppCompatActivity() {
         setupGestureDetector()
         // Set up click listeners
         setupClickListeners()
-        // Load initial book
-        loadCurrentBook()
-
-        val apiRecFetch = APIRecFetch(this)
-
-        apiRecFetch.getBookRecs(likedBooks, dislikedBooks)
+        // Get initial 5 recommendations
+        getRecommendations(likedBooks, dislikedBooks)
     }
 
     private fun initializeViews() {
@@ -112,8 +97,6 @@ class MainActivity : AppCompatActivity() {
             true
         }
     }
-
-
 
     private fun setupClickListeners() {
         heartButton.setOnClickListener {
@@ -181,7 +164,6 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-
     private fun animateAndLike() {
         val animation = TranslateAnimation(
             0f, bookImageView.width.toFloat(),
@@ -228,20 +210,82 @@ class MainActivity : AppCompatActivity() {
         bookImageView.startAnimation(animation)
     }
 
-    private fun loadCurrentBook() {
-        if (currentBookIndex < bookCovers.size) {
-            bookImageView.setImageResource(bookCovers[currentBookIndex])
-            titleText.text = bookTitles.getOrNull(currentBookIndex) ?: "Unknown Title"
-            bookDescription.text = bookDescriptions.getOrNull(currentBookIndex)
-                ?: "No description available"
+    suspend fun loadQueue() {
+        for (i in bookReturn.size - 1 downTo 0) {
+            println("Searching for cover image for: ${bookReturn[i].title}")
+            val coverImageUrl: String? = loadBookCover(bookReturn[i].title)
+
+            if (coverImageUrl != null) {
+                val coverDrawable = fetchDrawableFromUrl(coverImageUrl)
+                if (coverDrawable != null) {
+                    bookCovers.add(coverDrawable) // Only add valid drawables to the list
+                    println("Drawable added for ${bookReturn[i].title}")
+                } else {
+                    println("Failed to convert URL to Drawable for ${bookReturn[i].title}")
+                }
+            } else {
+                println("Cover image URL is null for ${bookReturn[i].title}")
+            }
+
+            bookQueue.add(bookReturn[i])
+            bookReturn.removeAt(i)
+        }
+
+        // Only call queueResolved if bookCovers has items
+        if (bookCovers.isNotEmpty()) {
+            queueResolved()
         } else {
+            println("No cover images could be loaded.")
+        }
+    }
+
+    private suspend fun fetchDrawableFromUrl(url: String): Drawable? = withContext(Dispatchers.IO) {
+        try {
+            val connection = URL(url).openConnection() as HttpURLConnection
+            connection.doInput = true
+            connection.connect()
+
+            val inputStream = connection.inputStream
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            BitmapDrawable(null, bitmap)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    private suspend fun loadBookCover(title: String): String?{
+        val apiCoverFetch = CoverJPG()
+        return apiCoverFetch.searchBookByTitle(title)
+    }
+
+    private fun queueResolved(){
+        println("All covers resolved.")
+        loadCurrentBook()
+    }
+
+    private fun loadCurrentBook() {
+        if (currentBookIndex < bookQueue.size) {
+            bookImageView.setImageDrawable(bookCovers[currentBookIndex])
+            titleText.text = bookQueue[currentBookIndex].title
+            bookDescription.text = bookQueue[currentBookIndex].description
+        }
+        else if(bookQueue.size == 0){
+            getRecommendations(likedBooks, dislikedBooks)
+        }
+        else {
             currentBookIndex = 0
             loadCurrentBook()
         }
     }
 
+    private fun getRecommendations(likedBooks: Array<Book>, dislikedBooks: Array<Book>){
+        val apiRecFetch = APIRecFetch(this)
+        apiRecFetch.getBookRecs(likedBooks, dislikedBooks)
+    }
+
     private fun loadNextBook() {
-        currentBookIndex = (currentBookIndex + 1) % bookCovers.size
+        currentBookIndex = (currentBookIndex + 1) % this.bookCovers.size
         loadCurrentBook()
     }
 
@@ -275,7 +319,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showBookDetails() {
         // TODO: Implement book details view
-        Toast.makeText(this, "Showing details for: ${bookTitles.getOrNull(currentBookIndex)}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Showing details for: ${allBooks[currentBookIndex].title}", Toast.LENGTH_SHORT).show()
     }
 
     companion object {

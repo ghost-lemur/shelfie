@@ -4,18 +4,30 @@ import android.app.Activity
 import okhttp3.*
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.RequestBody.Companion.toRequestBody
-import com.google.gson.Gson
-import com.google.gson.JsonObject
+import com.google.gson.*
 import java.io.IOException
-import java.io.File
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 class APIRecFetch(private val activity: Activity) {
 
-    fun getBookRecs(liked: Array<Array<String>>, disliked: Array<Array<String>>) {
+    fun getBookRecs(liked: Array<Book>, disliked: Array<Book>) {
         // Initialize OkHttp client
         val client = OkHttpClient()
 
-        val apiKey = File("api-key.txt").readText()
+        val apiKey = activity.assets.open("api-key.txt").bufferedReader().use { it.readText() }
+
+        //format liked and disliked arrays into strings for input
+        var likedString = "Liked:\n"
+        for (book in liked) {
+            likedString += "[[\"${book.title}\", \"${book.author}\", \"${book.description}\"]], "
+        }
+        likedString = likedString.dropLast(2) + "\n"
+        var dislikedString = "Disliked:\n"
+        for (book in disliked) {
+            dislikedString += "[[\"${book.title}\", \"${book.author}\", \"${book.description}\"]], "
+        }
+        dislikedString = dislikedString.dropLast(2) + "\n"
 
         // Create requestBody from JSON
         val jsonBody = JsonObject().apply {
@@ -73,13 +85,7 @@ class APIRecFetch(private val activity: Activity) {
                         "  ]\n" +
                         "}" +
                         "Please adhere only to this format and don't add any extra text to your response. Book recommendations should be creative and unique, and should engage the user by supporting their preferences while encouraging them to explore new avenues."),
-                mapOf("role" to "user", "content" to "Liked: " +
-                        "[[\"The Hobbit\", \"J.R.R. Tolkien\", \"A fantasy adventure about Bilbo Baggins’ unexpected journey to reclaim a treasure from a dragon.\"], " +
-                        "[\"Bossypants\", \"Tina Fey\", \"A comedic memoir filled with funny anecdotes from the author's life and career in entertainment.\"], " +
-                        "[\"The Secret Garden\", \"Frances Hodgson Burnett\", \"A heartwarming story of a lonely girl who discovers the healing power of nature and friendship.\"]]\n" +
-                        "Disliked: " +
-                        "[[\"Fifty Shades of Grey\", \"E.L. James\", \"A controversial romance novel criticized for its portrayal of relationships and controversial themes.\"], " +
-                        "[\"The Alchemist\", \"Paulo Coelho\", \"A philosophical novel about self-discovery that some find overly simplistic or preachy.\"]]")
+                mapOf("role" to "user", "content" to (likedString + dislikedString))
             )))
         }
         val requestBody = jsonBody.toString().toRequestBody("application/json".toMediaTypeOrNull())
@@ -101,6 +107,7 @@ class APIRecFetch(private val activity: Activity) {
                 }
             }
 
+
             override fun onResponse(call: Call, response: Response) {
                 response.use {
                     if (it.isSuccessful) {
@@ -108,12 +115,42 @@ class APIRecFetch(private val activity: Activity) {
                         // Use runOnUiThread to handle UI updates
                         activity.runOnUiThread {
                             println("Response: $responseText")
-                            // Update UI elements here, for example:
-                            // textView.text = responseText
+
+                            try {
+                                val jsonResponse = JsonParser.parseString(responseText).asJsonObject
+                                // The OpenAI API response structure is different - we need to parse the content
+                                val choices = jsonResponse.getAsJsonArray("choices")
+                                val firstChoice = choices[0].asJsonObject
+                                val messageContent = firstChoice.getAsJsonObject("message").get("content").asString
+
+                                // Now parse the actual book recommendations from the message content
+                                val booksJson = JsonParser.parseString(messageContent).asJsonObject
+                                val booksJsonArray = booksJson.getAsJsonArray("books")
+
+                                // Convert JSON array to a list of Book objects
+                                val bookList = booksJsonArray.map { bookJson: JsonElement ->
+                                    val bookMap = Gson().fromJson(bookJson, Map::class.java) as Map<String, Any?>
+                                    Book.fromMap(bookMap)
+                                }
+
+                                for(int in bookList) {
+                                    println(int.title)
+                                }
+
+                                // Append each book to the queue in MainActivity
+                                (activity as? MainActivity)?.bookReturn?.addAll(bookList)
+                                (activity as? androidx.lifecycle.LifecycleOwner)?.lifecycleScope?.launch {
+                                    (activity as? MainActivity)?.loadQueue()
+                                }
+                            } catch (e: Exception) {
+                                println("Error parsing response: ${e.message}")
+                                e.printStackTrace()
+                            }
                         }
                     } else {
                         activity.runOnUiThread {
                             println("Failed to get response: ${response.code}")
+                            println("API key: $apiKey")
                         }
                     }
                 }

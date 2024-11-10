@@ -5,58 +5,32 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
-object CoverJPG {
-    @JvmStatic
-
-/*
-    fun main(args: Array<String>) {
-        val bookTitle = "To Kill a Mockingbird"
-        val returnUrl = searchBookByTitle(bookTitle)
-        println(returnUrl)
-    }
-*/
-
+class CoverJPG {
     private fun extractCoverIdFromString(input: String): String? {
-        // Find the index of the key "cover_i"
-        val key = "\"cover_i\": "
-        val startIndex = input.indexOf(key)
-
-        if (startIndex != -1) {
-            // Move the index to the start of the number
-            val numberStartIndex = startIndex + key.length
-
-            // Find the end of the number (where the next comma or closing brace is)
-            val remaining = input.drop(startIndex)
-            val numberEndIndex = remaining.indexOfFirst { it == ',' || it == '}' || it == ' ' || it == '\n' } - 2
-
-            // Extract the substring containing the number
-            val coverId = input.substring(numberStartIndex, numberStartIndex + numberEndIndex).trim()
-            return coverId
-        }
-        return null
+        val regex = "\"cover_i\":\\s*(\\d+)"
+        val matchResult = Regex(regex).find(input)
+        return matchResult?.groups?.get(1)?.value
     }
 
-
-    fun searchBookByTitle(title: String): String? {
+    // Make the function a suspend function to use with coroutines
+    suspend fun searchBookByTitle(title: String): String? = withContext(Dispatchers.IO) {
         try {
-            // URL encode the book title
             val encodedTitle = URLEncoder.encode(title, "UTF-8")
             val apiUrl = "https://openlibrary.org/search.json?title=$encodedTitle"
 
-            // Create a connection
             val url = URL(apiUrl)
             val connection = url.openConnection() as HttpURLConnection
             connection.requestMethod = "GET"
 
-            // Get the response code
             val responseCode = connection.responseCode
             if (responseCode == HttpURLConnection.HTTP_OK) {
                 val `in` = BufferedReader(InputStreamReader(connection.inputStream))
-                var inputLine: String?
                 val response = StringBuilder()
 
-                // Read the response line by line
+                var inputLine: String?
                 while ((`in`.readLine().also { inputLine = it }) != null) {
                     response.append(inputLine)
                 }
@@ -66,15 +40,14 @@ object CoverJPG {
                 println(coverID)
                 val size = "M" //size image Medium
 
-                val coverUrl = "https://covers.openlibrary.org/b/id/$coverID-$size.jpg"
-                return coverUrl
-
+                "https://covers.openlibrary.org/b/id/$coverID-$size.jpg"
             } else {
                 println("GET request failed. Response Code: $responseCode")
+                null
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            null
         }
-        return null
     }
 }
