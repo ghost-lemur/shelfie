@@ -9,7 +9,6 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.animation.Animation
 import android.view.animation.TranslateAnimation
-import android.view.View
 import android.widget.TextView
 import kotlin.math.abs
 import android.content.Intent
@@ -30,29 +29,15 @@ class MainActivity : AppCompatActivity() {
         // Add more book cover resources here
     )
 
+    var allBooks: Array<Book> = arrayOf()
 
-    private var bookTitles = listOf(
-        "Sample Book 1",
-        // Add more book titles here
-    )
+    var likedBooks: Array<Book> = arrayOf()
 
-    private var bookAuthors = listOf(
-        "Sample Author 1"
-        // Add more book authors here
-    )
+    var dislikedBooks: Array<Book> = arrayOf()
 
-    private var bookDescriptions = listOf(
-        "Description for Sample Book 1",
-        // Add more book descriptions here
-    )
+    var bookReturn: MutableList<Book> = mutableListOf()
 
-    private var likedBooks = arrayOf(
-        arrayOf("")
-    )
-
-    private var dislikedBooks = arrayOf(
-        arrayOf("")
-    )
+    var bookQueue: MutableList<Book> = mutableListOf()
 
     private var currentBookIndex = 0
 
@@ -66,12 +51,8 @@ class MainActivity : AppCompatActivity() {
         setupGestureDetector()
         // Set up click listeners
         setupClickListeners()
-        // Load initial book
-        loadCurrentBook()
-
-        val apiRecFetch = APIRecFetch(this)
-
-        apiRecFetch.getBookRecs(likedBooks, dislikedBooks)
+        // Get initial 5 recommendations
+        getRecommendations(likedBooks, dislikedBooks)
     }
 
     private fun initializeViews() {
@@ -112,8 +93,6 @@ class MainActivity : AppCompatActivity() {
             true
         }
     }
-
-
 
     private fun setupClickListeners() {
         heartButton.setOnClickListener {
@@ -181,7 +160,6 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-
     private fun animateAndLike() {
         val animation = TranslateAnimation(
             0f, bookImageView.width.toFloat(),
@@ -228,11 +206,31 @@ class MainActivity : AppCompatActivity() {
         bookImageView.startAnimation(animation)
     }
 
+    suspend fun loadQueue(){
+        for(i in bookReturn.size-1 downTo 0){
+            println("Searching for cover image for: ${bookReturn[i].title}")
+            val coverImage: String? = loadBookCover(bookReturn[i].title)
+            println(coverImage)
+            bookQueue.add(bookReturn[i])
+            bookReturn.removeAt(i)
+        }
+        queueResolved()
+    }
+
+    private suspend fun loadBookCover(title: String): String?{
+        val apiCoverFetch = CoverJPG()
+        return apiCoverFetch.searchBookByTitle(title)
+    }
+
+    private fun queueResolved(){
+        println("All covers resolved.")
+    }
+
     private fun loadCurrentBook() {
         if (currentBookIndex < bookCovers.size) {
             bookImageView.setImageResource(bookCovers[currentBookIndex])
-            titleText.text = bookTitles.getOrNull(currentBookIndex) ?: "Unknown Title"
-            bookDescription.text = bookDescriptions.getOrNull(currentBookIndex)
+            titleText.text = allBooks[currentBookIndex].title
+            bookDescription.text = allBooks[currentBookIndex].description
                 ?: "No description available"
         } else {
             currentBookIndex = 0
@@ -240,8 +238,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun getRecommendations(likedBooks: Array<Book>, dislikedBooks: Array<Book>){
+        val apiRecFetch = APIRecFetch(this)
+        apiRecFetch.getBookRecs(likedBooks, dislikedBooks)
+    }
+
     private fun loadNextBook() {
-        currentBookIndex = (currentBookIndex + 1) % bookCovers.size
+        currentBookIndex = (currentBookIndex + 1) % this.bookCovers.size
         loadCurrentBook()
     }
 
@@ -275,7 +278,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showBookDetails() {
         // TODO: Implement book details view
-        Toast.makeText(this, "Showing details for: ${bookTitles.getOrNull(currentBookIndex)}", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Showing details for: ${allBooks[currentBookIndex].title}", Toast.LENGTH_SHORT).show()
     }
 
     companion object {
