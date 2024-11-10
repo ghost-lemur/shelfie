@@ -1,3 +1,4 @@
+![Shelfie Promo](https://github.com/ghost-lemur/shelfie/blob/master/ShelfiePromo.jpg)
 # Shelfie
 Unsure what to read next? Try Shelfie, an app that uses Artificial Intelligence to reccomend books based off of your favorite reads! Requires a ChatGPT API access key.
 
