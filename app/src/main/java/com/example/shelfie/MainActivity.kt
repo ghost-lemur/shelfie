@@ -12,6 +12,13 @@ import android.view.animation.TranslateAnimation
 import android.widget.TextView
 import kotlin.math.abs
 import android.content.Intent
+import android.graphics.drawable.Drawable
+import android.graphics.BitmapFactory
+import android.graphics.drawable.BitmapDrawable
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : AppCompatActivity() {
     private lateinit var bookImageView: ImageView
@@ -24,10 +31,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var bookDescription: TextView
 
     // Sample list of book covers and titles
-    private val bookCovers = listOf(
-        R.drawable.placeholder_book,
-        // Add more book cover resources here
-    )
+    private var bookCovers: MutableList<Drawable> = mutableListOf()
 
     var allBooks: Array<Book> = arrayOf()
 
@@ -206,15 +210,48 @@ class MainActivity : AppCompatActivity() {
         bookImageView.startAnimation(animation)
     }
 
-    suspend fun loadQueue(){
-        for(i in bookReturn.size-1 downTo 0){
+    suspend fun loadQueue() {
+        for (i in bookReturn.size - 1 downTo 0) {
             println("Searching for cover image for: ${bookReturn[i].title}")
-            val coverImage: String? = loadBookCover(bookReturn[i].title)
-            println(coverImage)
+            val coverImageUrl: String? = loadBookCover(bookReturn[i].title)
+
+            if (coverImageUrl != null) {
+                val coverDrawable = fetchDrawableFromUrl(coverImageUrl)
+                if (coverDrawable != null) {
+                    bookCovers.add(coverDrawable) // Only add valid drawables to the list
+                    println("Drawable added for ${bookReturn[i].title}")
+                } else {
+                    println("Failed to convert URL to Drawable for ${bookReturn[i].title}")
+                }
+            } else {
+                println("Cover image URL is null for ${bookReturn[i].title}")
+            }
+
             bookQueue.add(bookReturn[i])
             bookReturn.removeAt(i)
         }
-        queueResolved()
+
+        // Only call queueResolved if bookCovers has items
+        if (bookCovers.isNotEmpty()) {
+            queueResolved()
+        } else {
+            println("No cover images could be loaded.")
+        }
+    }
+
+    private suspend fun fetchDrawableFromUrl(url: String): Drawable? = withContext(Dispatchers.IO) {
+        try {
+            val connection = URL(url).openConnection() as HttpURLConnection
+            connection.doInput = true
+            connection.connect()
+
+            val inputStream = connection.inputStream
+            val bitmap = BitmapFactory.decodeStream(inputStream)
+            BitmapDrawable(null, bitmap)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
     }
 
     private suspend fun loadBookCover(title: String): String?{
@@ -224,15 +261,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun queueResolved(){
         println("All covers resolved.")
+        loadCurrentBook()
     }
 
     private fun loadCurrentBook() {
-        if (currentBookIndex < bookCovers.size) {
-            bookImageView.setImageResource(bookCovers[currentBookIndex])
-            titleText.text = allBooks[currentBookIndex].title
-            bookDescription.text = allBooks[currentBookIndex].description
-                ?: "No description available"
-        } else {
+        if (currentBookIndex < bookQueue.size) {
+            bookImageView.setImageDrawable(bookCovers[currentBookIndex])
+            titleText.text = bookQueue[currentBookIndex].title
+            bookDescription.text = bookQueue[currentBookIndex].description
+        }
+        else if(bookQueue.size == 0){
+            getRecommendations(likedBooks, dislikedBooks)
+        }
+        else {
             currentBookIndex = 0
             loadCurrentBook()
         }
