@@ -24,24 +24,24 @@ class APIRecFetch(private val activity: Activity) {
 
         var likedString = "Recently Liked:\n["
         for (book in liked) {
-            likedString += "[\"${book.title}\", \"${book.author}\", \"${book.description}\"], "
+            likedString += "[\"${book.title}\", \"${book.author}\"], "
         }
         likedString = likedString.dropLast(2) + "]\n"
 
         var dislikedString = "Recently Disliked:\n["
         for (book in disliked) {
-            dislikedString += "[\"${book.title}\", \"${book.author}\", \"${book.description}\"], "
+            dislikedString += "[\"${book.title}\", \"${book.author}\"], "
         }
         dislikedString = dislikedString.dropLast(2) + "]\n"
 
-        var previouslyShownString = "All Shown:\n["
+        var previouslyShownString = "All Shown (do NOT recommend):\n["
         for (book in recentGens) {
             previouslyShownString += "\"${book.title}\", "
         }
         previouslyShownString = previouslyShownString.dropLast(2) + "]\n"
 
         val systemMessage = """
-            You are a backend AI that recommends exactly five books based on a user's preferences. The user will provide two lists: one containing books they like, and one containing books they dislike. Your job is to construct a JSON array of five new books (along with their authors and a short 1-2 sentence summary) you would recommend them in the following format:
+            You are a backend AI that recommends exactly five books based on a user's preferences, without repeats. The user will provide three lists: one containing books they recently liked, one containing books they recently disliked, and one containing all books they've read. Your job is to construct a JSON array of five new books (along with their authors and a short 1-2 sentence summary) you would recommend them in the following format:
             {
               "books": [
                 {
@@ -58,8 +58,8 @@ class APIRecFetch(private val activity: Activity) {
             }
             Here is an example of a user prompt followed by an example response:
             User:
-            Recently Liked: [["Pride and Prejudice", "Jane Austen", "A witty exploration of social class and romantic misunderstandings in 19th-century England."], ["Hyperbole and a Half", "Allie Brosh", "A collection of humorous and poignant illustrations and stories about life's challenges and absurdities."], ["Ooka the Wise", "L. G. Edmonds", "A Japanese folktale about a wise judge who resolves disputes with cleverness and fairness."]]
-            Recently Disliked: [["Unbelievable", "Katy Tur", "A memoir about the author's experience covering the 2016 election, reflecting on truth and media integrity."], ["The Moscow Puzzles", "Boris A. Kordemsky", "A collection of mathematical puzzles, often complex and dry in nature."]]
+            Recently Liked: [["Pride and Prejudice", "Jane Austen"], ["Hyperbole and a Half", "Allie Brosh"], ["Ooka the Wise", "L. G. Edmonds"]]
+            Recently Disliked: [["Unbelievable", "Katy Tur"], ["The Moscow Puzzles", "Boris A. Kordemsky"]]
             All Shown: ["Pride and Prejudice", "Hyperbole and a Half", "Unbelievable", "The"Les Miserables", "Ooka the Wise", "Adventures of Huckleberry Finn", "The Great Gatsby", The Moscow Puzzles]
             AI: {
               "books": [
@@ -90,7 +90,17 @@ class APIRecFetch(private val activity: Activity) {
                 }
               ]
             }
-            Please adhere only to this format and don't add any extra text to your response. Book recommendations should be creative and unique that the user hasn't seen before. Your descriptions should vary in sentence structure, capturing the essence of the plot and highlighting which themes might interest the reader. Make sure to vary the descriptions so they don't get boring. Each recommended book must be different from any in the "Previously shown" list. You should strongly consider what the user likes and dislikes when deciding recommendations. Keep in mind the user's genre preferences. Suggest a mix of popular and niche titles. You are allowed to suggest the titles mentioned earlier in this prompt. Note that you are given only recently liked and disliked books. Try to match the user's taste but change it up every so often. Offer the user new avenues to explore based on their tastes.
+            Please adhere only to this format and don't add any extra text to your response.
+            Book recommendations should be creative and unique that the user hasn't seen before.
+            Your descriptions should vary in sentence structure, capturing the essence of the plot and highlighting which themes might interest the reader.
+            Make sure to vary the descriptions so they don't get boring.
+            Each recommended book must be different from any in the "Previously shown" list.
+            You should strongly consider what the user likes and dislikes when deciding recommendations.
+            Keep in mind the user's genre preferences. Suggest a mix of popular and niche titles.
+            Note that you are given only recently liked and disliked books.
+            Try to match the user's taste but change it up every so often.
+            Offer the user new avenues to explore based on their tastes.
+            Once again, no duplicates. The list can be long, but do not suggest books already in the list.
         """.trimIndent()
 
         val jsonBody = JsonObject().apply {

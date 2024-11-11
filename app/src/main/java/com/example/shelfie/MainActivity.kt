@@ -161,8 +161,8 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                val recentGens: List<Book> = bookQueue + bookReturn + prefsManager.getShownBooks()
-                getRecommendations(likedBooks.takeLast(20).toTypedArray(), dislikedBooks.takeLast(20).toTypedArray(), recentGens)
+                val recentGens: List<Book> = (prefsManager.getShownBooks() + bookQueue + bookReturn).reversed()
+                getRecommendations(prefsManager.getLikedBooks().takeLast(15).reversed().toTypedArray(), dislikedBooks.takeLast(15).reversed().toTypedArray(), recentGens)
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@MainActivity, "Error loading books: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -176,11 +176,10 @@ class MainActivity : AppCompatActivity() {
         println("EXTEND QUEUE:\n Loading: $isLoading\nExtending: $isExtending")
         if (isExtending) return
         isExtending = true
-
         lifecycleScope.launch {
             try {
-                val recentGens: List<Book> = bookQueue + bookReturn + prefsManager.getShownBooks()
-                getRecommendations(likedBooks.toTypedArray(), dislikedBooks.toTypedArray(), recentGens)
+                val recentGens: List<Book> = (prefsManager.getShownBooks() + bookQueue + bookReturn).reversed()
+                getRecommendations(prefsManager.getLikedBooks().takeLast(15).reversed().toTypedArray(), dislikedBooks.takeLast(15).reversed().toTypedArray(), recentGens)
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@MainActivity, "Error loading books: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -202,7 +201,7 @@ class MainActivity : AppCompatActivity() {
 
                     if (newBooks.isEmpty()) {
                         // If all books have been shown, clear history and try again
-                        prefsManager.clearShownBooks()
+                        println("ALL BOOKS SHOWN, REGENERATING")
                         getRecommendations(liked, disliked, queue)
                         return@launch
                     }
