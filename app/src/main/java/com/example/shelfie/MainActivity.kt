@@ -23,6 +23,10 @@ import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Collections
+import android.view.animation.ScaleAnimation
+import android.view.animation.BounceInterpolator
+import android.view.animation.RotateAnimation
+import android.view.animation.LinearInterpolator
 
 class MainActivity : AppCompatActivity() {
     // View declarations
@@ -38,6 +42,8 @@ class MainActivity : AppCompatActivity() {
 
     // State management
     private var isLoading = false
+    private var isExtending = false
+    private var isBuildingQueue = false
     private var currentBookIndex = 0
 
     // Synchronized collections for thread safety
@@ -96,8 +102,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupClickListeners() {
-        heartButton.setOnClickListener { animateAndLike() }
-        recycleButton.setOnClickListener { animateAndSkip() }
+        heartButton.setOnClickListener {
+            if(!isLoading){
+                animateAndLike()
+            }
+        }
+        recycleButton.setOnClickListener {
+            if(!isLoading){
+                animateAndSkip()
+            }
+        }
 
         homeButton.setOnClickListener {
             homeButton.setColorFilter(ContextCompat.getColor(this, android.R.color.black))
@@ -124,9 +138,11 @@ class MainActivity : AppCompatActivity() {
 
                 if (abs(diffX) > abs(diffY) &&
                     abs(diffX) > SWIPE_THRESHOLD &&
-                    abs(velocityX) > SWIPE_VELOCITY_THRESHOLD) {
+                    abs(velocityX) > SWIPE_VELOCITY_THRESHOLD &&
+                    !isLoading) {
                     if (diffX > 0) animateAndLike() else animateAndSkip()
                     return true
+
                 }
                 return false
             }
@@ -139,8 +155,27 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadInitialBooks() {
+        println("LOAD QUEUE:\nLoading: $isLoading\nExtending: $isExtending")
         if (isLoading) return
         isLoading = true
+
+        lifecycleScope.launch {
+            try {
+                val recentGens: List<Book> = bookQueue + bookReturn + prefsManager.getShownBooks()
+                getRecommendations(likedBooks.takeLast(20).toTypedArray(), dislikedBooks.takeLast(20).toTypedArray(), recentGens)
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(this@MainActivity, "Error loading books: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
+                isLoading = false
+            }
+        }
+    }
+
+    private fun extendQueue(){
+        println("EXTEND QUEUE:\n Loading: $isLoading\nExtending: $isExtending")
+        if (isExtending) return
+        isExtending = true
 
         lifecycleScope.launch {
             try {
@@ -150,15 +185,12 @@ class MainActivity : AppCompatActivity() {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(this@MainActivity, "Error loading books: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
-            } finally {
-                isLoading = false
             }
         }
     }
 
     private fun getRecommendations(liked: Array<Book>, disliked: Array<Book>, queue: List<Book>) {
         val apiRecFetch = APIRecFetch(this)
-        //val shownBooks = prefsManager.getShownBooks() // Get list of previously shown books
 
         apiRecFetch.getBookRecs(liked, disliked, queue, object : APIRecFetch.BookRecommendationCallback {
             override fun onSuccess(books: List<Book>) {
@@ -188,8 +220,14 @@ class MainActivity : AppCompatActivity() {
 
 
     private suspend fun loadQueue() = withContext(Dispatchers.IO) {
+        if(isBuildingQueue){
+            return@withContext
+        }
+        isBuildingQueue = true
+
         try {
-            for (book in bookReturn.toList()) {  // Create a copy to avoid concurrent modification
+            while(bookReturn.isNotEmpty()) {
+                val book = bookReturn[currentBookIndex]// Create a copy to avoid concurrent modification
                 val coverImageUrl = loadBookCover(book.title)
                 if (coverImageUrl != null) {
                     val coverDrawable = fetchDrawableFromUrl(coverImageUrl)
@@ -202,18 +240,37 @@ class MainActivity : AppCompatActivity() {
                             bookReturn.remove(book)
                         }
                     }
+                    else{
+                        withContext(Dispatchers.Main) {
+                            bookReturn.remove(book)
+                        }
+                    }
+                }
+                else{
+                    withContext(Dispatchers.Main) {
+                        bookReturn.remove(book)
+                    }
                 }
             }
 
             withContext(Dispatchers.Main) {
                 if (bookCovers.isNotEmpty()) {
+                    isLoading = false
+                    isExtending = false
+                    isBuildingQueue = false
                     loadCurrentBook()
                 } else {
+                    isLoading = false
+                    isExtending = false
+                    isBuildingQueue = false
                     Toast.makeText(this@MainActivity, "No book covers could be loaded", Toast.LENGTH_SHORT).show()
                 }
             }
         } catch (e: Exception) {
             withContext(Dispatchers.Main) {
+                isLoading = false
+                isExtending = false
+                isBuildingQueue = false
                 Toast.makeText(this@MainActivity, "Error loading queue: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
@@ -243,10 +300,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        if (currentBookIndex >= bookQueue.size) {
-            currentBookIndex = 0
-        }
-
         try {
             bookImageView.setImageDrawable(bookCovers[currentBookIndex])
             titleText.text = bookQueue[currentBookIndex].title
@@ -256,11 +309,37 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun loadNextBook() {
+        prefsManager.addShownBook(bookQueue[currentBookIndex])
+        bookQueue.removeAt(currentBookIndex)
+        bookCovers.removeAt(currentBookIndex)
+        println("Queue: ${bookQueue.size}")
+        for (book in bookQueue) {
+            println("Book: ${book.title}")
+        }
+        println("Return: ${bookReturn.size}")
+        for (book in bookReturn) {
+            println("Book: ${book.title}")
+        }
+        if(bookQueue.size==0){
+            loadInitialBooks()
+            return
+        }
+        if (currentBookIndex >= bookQueue.size - 4) {
+            extendQueue()
+            loadCurrentBook()
+            return
+        }
+        loadCurrentBook()
+    }
+
     private fun animateAndLike() {
+        animateHeartButton()
         animateSwipe(true) { likeCurrentItem() }
     }
 
     private fun animateAndSkip() {
+        animateSkipButton()
         animateSwipe(false) { skipCurrentItem() }
     }
 
@@ -274,19 +353,49 @@ class MainActivity : AppCompatActivity() {
             duration = 300
             setAnimationListener(object : Animation.AnimationListener {
                 override fun onAnimationStart(animation: Animation?) {
+                    // Disable the buttons here
                     heartButton.isEnabled = false
                     recycleButton.isEnabled = false
                 }
-                override fun onAnimationRepeat(animation: Animation?) {}
+
                 override fun onAnimationEnd(animation: Animation?) {
                     bookImageView.translationX = 0f
                     onComplete()
+                    // Enable the buttons here
                     heartButton.isEnabled = true
                     recycleButton.isEnabled = true
                 }
+
+                override fun onAnimationRepeat(animation: Animation?) {}
             })
         }
+
         bookImageView.startAnimation(animation)
+    }
+
+    private fun animateHeartButton() {
+        val scaleAnimation = ScaleAnimation(
+            1.0f, 1.2f, 1.0f, 1.2f,
+            Animation.RELATIVE_TO_SELF, 0.5f,
+            Animation.RELATIVE_TO_SELF, 0.5f
+        ).apply {
+            duration = 150
+            interpolator = BounceInterpolator()
+            repeatCount = 1
+        }
+        heartButton.startAnimation(scaleAnimation)
+    }
+
+    private fun animateSkipButton() {
+        val rotateAnimation = RotateAnimation(
+            0f, 360f,
+            Animation.RELATIVE_TO_SELF, 0.5f,
+            Animation.RELATIVE_TO_SELF, 0.5f
+        ).apply {
+            duration = 150
+            interpolator = LinearInterpolator()
+        }
+        recycleButton.startAnimation(rotateAnimation)
     }
 
     private fun likeCurrentItem() {
@@ -294,7 +403,6 @@ class MainActivity : AppCompatActivity() {
             val book = bookQueue[currentBookIndex]
             likedBooks.add(book)
             prefsManager.saveLikedBook(book)
-            //prefsManager.addShownBook(book)
             loadNextBook()
         }
     }
@@ -302,18 +410,9 @@ class MainActivity : AppCompatActivity() {
         if (currentBookIndex < bookQueue.size) {
             bookQueue[currentBookIndex].let { book ->
                 dislikedBooks.add(book)
-                //prefsManager.addShownBook(book) // Mark as shown
                 loadNextBook()
             }
         }
-    }
-    private fun loadNextBook() {
-        bookQueue.removeAt(currentBookIndex)
-        bookCovers.removeAt(currentBookIndex)
-        if (currentBookIndex >= bookQueue.size - 4) {
-            loadInitialBooks()
-        }
-        loadCurrentBook()
     }
 
     private fun showBookDetails() {

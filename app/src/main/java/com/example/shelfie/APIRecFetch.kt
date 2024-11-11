@@ -22,23 +22,23 @@ class APIRecFetch(private val activity: Activity) {
         val client = OkHttpClient()
         val apiKey = activity.assets.open("api-key.txt").bufferedReader().use { it.readText() }
 
-        var likedString = "Liked:\n"
+        var likedString = "Recently Liked:\n["
         for (book in liked) {
-            likedString += "[[\"${book.title}\", \"${book.author}\", \"${book.description}\"]], "
+            likedString += "[\"${book.title}\", \"${book.author}\", \"${book.description}\"], "
         }
-        likedString = likedString.dropLast(2) + "\n"
+        likedString = likedString.dropLast(2) + "]\n"
 
-        var dislikedString = "Disliked:\n"
+        var dislikedString = "Recently Disliked:\n["
         for (book in disliked) {
-            dislikedString += "[[\"${book.title}\", \"${book.author}\", \"${book.description}\"]], "
+            dislikedString += "[\"${book.title}\", \"${book.author}\", \"${book.description}\"], "
         }
-        dislikedString = dislikedString.dropLast(2) + "\n"
+        dislikedString = dislikedString.dropLast(2) + "]\n"
 
-        var previouslyShownString = "Recently Shown:\n"
+        var previouslyShownString = "All Shown:\n["
         for (book in recentGens) {
             previouslyShownString += "\"${book.title}\", "
         }
-        previouslyShownString = previouslyShownString.dropLast(2) + "\n"
+        previouslyShownString = previouslyShownString.dropLast(2) + "]\n"
 
         val systemMessage = """
             You are a backend AI that recommends exactly five books based on a user's preferences. The user will provide two lists: one containing books they like, and one containing books they dislike. Your job is to construct a JSON array of five new books (along with their authors and a short 1-2 sentence summary) you would recommend them in the following format:
@@ -58,9 +58,9 @@ class APIRecFetch(private val activity: Activity) {
             }
             Here is an example of a user prompt followed by an example response:
             User:
-            Liked: [["Pride and Prejudice", "Jane Austen", "A witty exploration of social class and romantic misunderstandings in 19th-century England."], ["Hyperbole and a Half", "Allie Brosh", "A collection of humorous and poignant illustrations and stories about life's challenges and absurdities."], ["Ooka the Wise", "L. G. Edmonds", "A Japanese folktale about a wise judge who resolves disputes with cleverness and fairness."]]
-            Disliked: [["Unbelievable", "Katy Tur", "A memoir about the author's experience covering the 2016 election, reflecting on truth and media integrity."], ["The Moscow Puzzles", "Boris A. Kordemsky", "A collection of mathematical puzzles, often complex and dry in nature."]]
-            Recently Shown: [["Les Miserables", "Victor Hugo", "A gripping novel about an ex-convict in 19th-century France who seeks redemption while being pursued by a strict inspector."]]
+            Recently Liked: [["Pride and Prejudice", "Jane Austen", "A witty exploration of social class and romantic misunderstandings in 19th-century England."], ["Hyperbole and a Half", "Allie Brosh", "A collection of humorous and poignant illustrations and stories about life's challenges and absurdities."], ["Ooka the Wise", "L. G. Edmonds", "A Japanese folktale about a wise judge who resolves disputes with cleverness and fairness."]]
+            Recently Disliked: [["Unbelievable", "Katy Tur", "A memoir about the author's experience covering the 2016 election, reflecting on truth and media integrity."], ["The Moscow Puzzles", "Boris A. Kordemsky", "A collection of mathematical puzzles, often complex and dry in nature."]]
+            All Shown: ["Pride and Prejudice", "Hyperbole and a Half", "Unbelievable", "The"Les Miserables", "Ooka the Wise", "Adventures of Huckleberry Finn", "The Great Gatsby", The Moscow Puzzles]
             AI: {
               "books": [
                 {
@@ -90,7 +90,7 @@ class APIRecFetch(private val activity: Activity) {
                 }
               ]
             }
-            Please adhere only to this format and don't add any extra text to your response. Book recommendations should be creative and unique that the user hasn't seen before (especially the books in the "recently shown" list), supporting their preferences while encouraging them to explore new avenues. Each recommended book must be different from any in the "Previously shown" list, and should engage the user by supporting their preferences while encouraging them to explore new avenues.
+            Please adhere only to this format and don't add any extra text to your response. Book recommendations should be creative and unique that the user hasn't seen before. Your descriptions should vary in sentence structure, capturing the essence of the plot and highlighting which themes might interest the reader. Make sure to vary the descriptions so they don't get boring. Each recommended book must be different from any in the "Previously shown" list. You should strongly consider what the user likes and dislikes when deciding recommendations. Keep in mind the user's genre preferences. Suggest a mix of popular and niche titles. You are allowed to suggest the titles mentioned earlier in this prompt. Note that you are given only recently liked and disliked books. Try to match the user's taste but change it up every so often. Offer the user new avenues to explore based on their tastes.
         """.trimIndent()
 
         val jsonBody = JsonObject().apply {
