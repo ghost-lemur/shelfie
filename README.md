@@ -1,4 +1,4 @@
-![Shelfie Promo](https://github.com/ghost-lemur/shelfie/blob/master/ShelfiePromo.jpg)
+![{A11E0206-D6F0-4156-BF73-23BC026713A3}](https://github.com/user-attachments/assets/12521d29-9e9e-492f-916d-cbbf8da23798)
 # Shelfie
 Unsure what to read next? Try Shelfie, an app that uses Artificial Intelligence to reccomend books based off of your favorite reads! Requires a ChatGPT API access key.
 
